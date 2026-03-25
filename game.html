@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>ZoarsPunch - Teste</title>
+
+<style>
+    body {
+        font-family: Arial;
+        text-align: center;
+        background: #111;
+        color: white;
+    }
+
+    .box {
+        border: 2px solid white;
+        padding: 20px;
+        margin: 20px;
+        display: inline-block;
+        width: 200px;
+    }
+
+    button {
+        padding: 10px;
+        margin: 5px;
+        font-size: 16px;
+        cursor: pointer;
+    }
+
+    #log {
+        margin-top: 20px;
+        height: 200px;
+        overflow-y: auto;
+        border: 1px solid white;
+        padding: 10px;
+        text-align: left;
+    }
+</style>
+</head>
+
+<body>
+
+<h1>💥 ZoarsPunch - Sistema de Combate</h1>
+
+<div class="box">
+    <h2>Jogador</h2>
+    <p id="playerHP">Vida: 100</p>
+</div>
+
+<div class="box">
+    <h2>Inimigo</h2>
+    <p id="enemyHP">Vida: 80</p>
+</div>
+
+<div>
+    <button onclick="playerAttack('soco')">👊 Soco</button>
+    <button onclick="playerAttack('chute')">🦵 Chute</button>
+    <button onclick="playerAttack('especial')">🔥 Especial</button>
+</div>
+
+<div id="log"></div>
+
+<script>
+class Entity {
+    constructor(nome, vida, ataque, defesa) {
+        this.nome = nome;
+        this.vida = vida;
+        this.ataque = ataque;
+        this.defesa = defesa;
+    }
+
+    receberDano(dano) {
+        let danoFinal = dano - this.defesa;
+        if (danoFinal < 1) danoFinal = 1;
+
+        this.vida -= danoFinal;
+
+        log(`${this.nome} recebeu ${danoFinal} de dano (Vida: ${this.vida})`);
+
+        if (this.vida <= 0) {
+            this.morrer();
+        }
+    }
+
+    morrer() {
+        log(`${this.nome} morreu!`);
+    }
+}
+
+class Player extends Entity {
+    atacar(alvo, tipo) {
+        let dano = this.ataque;
+
+        if (tipo === "chute") dano += 5;
+        if (tipo === "especial") dano *= 2;
+
+        // crítico
+        if (Math.random() < 0.2) {
+            dano *= 2;
+            log("💥 CRÍTICO!");
+        }
+
+        log(`Você usou ${tipo}`);
+        alvo.receberDano(dano);
+    }
+}
+
+class Enemy extends Entity {
+    atacar(alvo) {
+        let dano = this.ataque + Math.floor(Math.random() * 5 - 2);
+        if (dano < 1) dano = 1;
+
+        log("👹 Inimigo atacou!");
+        alvo.receberDano(dano);
+    }
+}
+
+// instâncias
+let player = new Player("Jogador", 100, 15, 5);
+let enemy = new Enemy("Inimigo", 80, 10, 3);
+
+// UI
+function updateUI() {
+    document.getElementById("playerHP").innerText = "Vida: " + player.vida;
+    document.getElementById("enemyHP").innerText = "Vida: " + enemy.vida;
+}
+
+function log(texto) {
+    let logDiv = document.getElementById("log");
+    logDiv.innerHTML += texto + "<br>";
+    logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+function playerAttack(tipo) {
+    if (player.vida <= 0 || enemy.vida <= 0) return;
+
+    player.atacar(enemy, tipo);
+    updateUI();
+
+    if (enemy.vida <= 0) {
+        log("🏆 Você venceu!");
+        return;
+    }
+
+    // turno inimigo
+    setTimeout(() => {
+        enemy.atacar(player);
+        updateUI();
+
+        if (player.vida <= 0) {
+            log("💀 Você perdeu!");
+        }
+    }, 500);
+}
+
+// iniciar UI
+updateUI();
+</script>
+
+</body>
+</html>
