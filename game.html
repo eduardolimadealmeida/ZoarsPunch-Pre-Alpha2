@@ -1,160 +1,162 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>ZoarsPunch - Teste</title>
-
+<title>ZoarsPunch FPS</title>
 <style>
-    body {
-        font-family: Arial;
-        text-align: center;
-        background: #111;
-        color: white;
-    }
-
-    .box {
-        border: 2px solid white;
-        padding: 20px;
-        margin: 20px;
-        display: inline-block;
-        width: 200px;
-    }
-
-    button {
-        padding: 10px;
-        margin: 5px;
-        font-size: 16px;
-        cursor: pointer;
-    }
-
-    #log {
-        margin-top: 20px;
-        height: 200px;
-        overflow-y: auto;
-        border: 1px solid white;
-        padding: 10px;
-        text-align: left;
-    }
+body { margin: 0; overflow: hidden; background: black; }
+#ui {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    color: white;
+    font-family: Arial;
+}
 </style>
 </head>
-
 <body>
 
-<h1>💥 ZoarsPunch - Sistema de Combate</h1>
-
-<div class="box">
-    <h2>Jogador</h2>
-    <p id="playerHP">Vida: 100</p>
+<div id="ui">
+    Vida: <span id="hp">100</span><br>
+    Inimigos: <span id="enemies">0</span>
 </div>
 
-<div class="box">
-    <h2>Inimigo</h2>
-    <p id="enemyHP">Vida: 80</p>
-</div>
-
-<div>
-    <button onclick="playerAttack('soco')">👊 Soco</button>
-    <button onclick="playerAttack('chute')">🦵 Chute</button>
-    <button onclick="playerAttack('especial')">🔥 Especial</button>
-</div>
-
-<div id="log"></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 
 <script>
-class Entity {
-    constructor(nome, vida, ataque, defesa) {
-        this.nome = nome;
-        this.vida = vida;
-        this.ataque = ataque;
-        this.defesa = defesa;
+let scene = new THREE.Scene();
+let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+let renderer = new THREE.WebGLRenderer();
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// luz
+let light = new THREE.PointLight(0xffffff, 1);
+light.position.set(10, 10, 10);
+scene.add(light);
+
+// chão
+let floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(100, 100),
+    new THREE.MeshBasicMaterial({color: 0x333333})
+);
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+
+// player
+camera.position.y = 2;
+let velocity = {x:0, z:0};
+let speed = 0.1;
+let hp = 100;
+
+// inimigos
+let enemies = [];
+
+function spawnEnemy() {
+    let enemy = new THREE.Mesh(
+        new THREE.BoxGeometry(1,2,1),
+        new THREE.MeshBasicMaterial({color: 0xff0000})
+    );
+
+    enemy.position.set(
+        Math.random()*20-10,
+        1,
+        Math.random()*20-10
+    );
+
+    enemy.hp = 30;
+    scene.add(enemy);
+    enemies.push(enemy);
+}
+
+for (let i=0;i<5;i++) spawnEnemy();
+
+// controles
+let keys = {};
+document.addEventListener("keydown", e => keys[e.key]=true);
+document.addEventListener("keyup", e => keys[e.key]=false);
+
+// mouse look
+let yaw = 0, pitch = 0;
+
+document.body.addEventListener("click", () => {
+    document.body.requestPointerLock();
+});
+
+document.addEventListener("mousemove", e => {
+    if (document.pointerLockElement === document.body) {
+        yaw -= e.movementX * 0.002;
+        pitch -= e.movementY * 0.002;
+
+        pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+
+        camera.rotation.set(pitch, yaw, 0);
     }
+});
 
-    receberDano(dano) {
-        let danoFinal = dano - this.defesa;
-        if (danoFinal < 1) danoFinal = 1;
+// tiro
+document.addEventListener("mousedown", () => {
+    let ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(0,0), camera);
 
-        this.vida -= danoFinal;
+    let hits = ray.intersectObjects(enemies);
 
-        log(`${this.nome} recebeu ${danoFinal} de dano (Vida: ${this.vida})`);
+    if (hits.length > 0) {
+        let enemy = hits[0].object;
+        enemy.hp -= 10;
 
-        if (this.vida <= 0) {
-            this.morrer();
+        if (enemy.hp <= 0) {
+            scene.remove(enemy);
+            enemies = enemies.filter(e => e !== enemy);
         }
     }
+});
 
-    morrer() {
-        log(`${this.nome} morreu!`);
+// loop
+function animate() {
+    requestAnimationFrame(animate);
+
+    // movimento
+    if (keys["w"]) {
+        camera.position.x -= Math.sin(yaw)*speed;
+        camera.position.z -= Math.cos(yaw)*speed;
     }
-}
+    if (keys["s"]) {
+        camera.position.x += Math.sin(yaw)*speed;
+        camera.position.z += Math.cos(yaw)*speed;
+    }
+    if (keys["a"]) {
+        camera.position.x -= Math.cos(yaw)*speed;
+        camera.position.z += Math.sin(yaw)*speed;
+    }
+    if (keys["d"]) {
+        camera.position.x += Math.cos(yaw)*speed;
+        camera.position.z -= Math.sin(yaw)*speed;
+    }
 
-class Player extends Entity {
-    atacar(alvo, tipo) {
-        let dano = this.ataque;
+    // inimigos te seguem
+    enemies.forEach(enemy => {
+        let dx = camera.position.x - enemy.position.x;
+        let dz = camera.position.z - enemy.position.z;
 
-        if (tipo === "chute") dano += 5;
-        if (tipo === "especial") dano *= 2;
+        let dist = Math.sqrt(dx*dx + dz*dz);
 
-        // crítico
-        if (Math.random() < 0.2) {
-            dano *= 2;
-            log("💥 CRÍTICO!");
+        enemy.position.x += dx/dist * 0.02;
+        enemy.position.z += dz/dist * 0.02;
+
+        if (dist < 1.5) {
+            hp -= 0.1;
         }
+    });
 
-        log(`Você usou ${tipo}`);
-        alvo.receberDano(dano);
-    }
+    document.getElementById("hp").innerText = Math.floor(hp);
+    document.getElementById("enemies").innerText = enemies.length;
+
+    renderer.render(scene, camera);
 }
 
-class Enemy extends Entity {
-    atacar(alvo) {
-        let dano = this.ataque + Math.floor(Math.random() * 5 - 2);
-        if (dano < 1) dano = 1;
-
-        log("👹 Inimigo atacou!");
-        alvo.receberDano(dano);
-    }
-}
-
-// instâncias
-let player = new Player("Jogador", 100, 15, 5);
-let enemy = new Enemy("Inimigo", 80, 10, 3);
-
-// UI
-function updateUI() {
-    document.getElementById("playerHP").innerText = "Vida: " + player.vida;
-    document.getElementById("enemyHP").innerText = "Vida: " + enemy.vida;
-}
-
-function log(texto) {
-    let logDiv = document.getElementById("log");
-    logDiv.innerHTML += texto + "<br>";
-    logDiv.scrollTop = logDiv.scrollHeight;
-}
-
-function playerAttack(tipo) {
-    if (player.vida <= 0 || enemy.vida <= 0) return;
-
-    player.atacar(enemy, tipo);
-    updateUI();
-
-    if (enemy.vida <= 0) {
-        log("🏆 Você venceu!");
-        return;
-    }
-
-    // turno inimigo
-    setTimeout(() => {
-        enemy.atacar(player);
-        updateUI();
-
-        if (player.vida <= 0) {
-            log("💀 Você perdeu!");
-        }
-    }, 500);
-}
-
-// iniciar UI
-updateUI();
+animate();
 </script>
 
 </body>
