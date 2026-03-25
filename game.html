@@ -3,51 +3,110 @@
 <head>
 <meta charset="UTF-8">
 <title>ZoarsPunch FPS</title>
+
 <style>
-body { margin: 0; overflow: hidden; background: black; }
+body { margin: 0; overflow: hidden; background: #000; }
+
 #ui {
     position: fixed;
     top: 10px;
     left: 10px;
     color: white;
     font-family: Arial;
+    font-size: 18px;
+}
+
+#crosshair {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin-left: -10px;
+    margin-top: -10px;
+}
+
+#crosshair::before, #crosshair::after {
+    content: "";
+    position: absolute;
+    background: white;
+}
+
+#crosshair::before {
+    width: 20px;
+    height: 2px;
+    top: 9px;
+}
+
+#crosshair::after {
+    width: 2px;
+    height: 20px;
+    left: 9px;
+}
+
+#gun {
+    position: fixed;
+    bottom: 0;
+    right: 50px;
+    width: 200px;
+    height: 120px;
+    background: linear-gradient(45deg, #444, #222);
+    border-radius: 20px;
+    transform: rotate(-10deg);
+    opacity: 0.9;
+}
+
+#hitmarker {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    color: red;
+    font-size: 30px;
+    transform: translate(-50%, -50%);
+    opacity: 0;
 }
 </style>
 </head>
+
 <body>
 
 <div id="ui">
-    Vida: <span id="hp">100</span><br>
-    Inimigos: <span id="enemies">0</span>
+    ❤️ Vida: <span id="hp">100</span><br>
+    👾 Inimigos: <span id="enemies">0</span>
 </div>
+
+<div id="crosshair"></div>
+<div id="gun"></div>
+<div id="hitmarker">X</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 
 <script>
 let scene = new THREE.Scene();
-let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-let renderer = new THREE.WebGLRenderer();
+scene.background = new THREE.Color(0x87ceeb);
 
+let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+let renderer = new THREE.WebGLRenderer({antialias: true});
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // luz
-let light = new THREE.PointLight(0xffffff, 1);
-light.position.set(10, 10, 10);
+let light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(5,10,7);
 scene.add(light);
 
-// chão
+// chão bonito
 let floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(100, 100),
-    new THREE.MeshBasicMaterial({color: 0x333333})
+    new THREE.PlaneGeometry(200, 200),
+    new THREE.MeshStandardMaterial({color: 0x228B22})
 );
-floor.rotation.x = -Math.PI / 2;
+floor.rotation.x = -Math.PI/2;
 scene.add(floor);
 
 // player
 camera.position.y = 2;
-let velocity = {x:0, z:0};
-let speed = 0.1;
+let yaw = 0, pitch = 0;
+let speed = 0.15;
 let hp = 100;
 
 // inimigos
@@ -56,13 +115,13 @@ let enemies = [];
 function spawnEnemy() {
     let enemy = new THREE.Mesh(
         new THREE.BoxGeometry(1,2,1),
-        new THREE.MeshBasicMaterial({color: 0xff0000})
+        new THREE.MeshStandardMaterial({color: 0xff4444})
     );
 
     enemy.position.set(
-        Math.random()*20-10,
+        Math.random()*40-20,
         1,
-        Math.random()*20-10
+        Math.random()*40-20
     );
 
     enemy.hp = 30;
@@ -70,16 +129,14 @@ function spawnEnemy() {
     enemies.push(enemy);
 }
 
-for (let i=0;i<5;i++) spawnEnemy();
+for (let i=0;i<8;i++) spawnEnemy();
 
 // controles
 let keys = {};
 document.addEventListener("keydown", e => keys[e.key]=true);
 document.addEventListener("keyup", e => keys[e.key]=false);
 
-// mouse look
-let yaw = 0, pitch = 0;
-
+// mouse
 document.body.addEventListener("click", () => {
     document.body.requestPointerLock();
 });
@@ -90,12 +147,11 @@ document.addEventListener("mousemove", e => {
         pitch -= e.movementY * 0.002;
 
         pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
-
         camera.rotation.set(pitch, yaw, 0);
     }
 });
 
-// tiro
+// tiro melhorado
 document.addEventListener("mousedown", () => {
     let ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2(0,0), camera);
@@ -104,11 +160,17 @@ document.addEventListener("mousedown", () => {
 
     if (hits.length > 0) {
         let enemy = hits[0].object;
-        enemy.hp -= 10;
+        enemy.hp -= 15;
+
+        // hitmarker
+        let hit = document.getElementById("hitmarker");
+        hit.style.opacity = 1;
+        setTimeout(() => hit.style.opacity = 0, 100);
 
         if (enemy.hp <= 0) {
             scene.remove(enemy);
             enemies = enemies.filter(e => e !== enemy);
+            spawnEnemy();
         }
     }
 });
@@ -117,36 +179,34 @@ document.addEventListener("mousedown", () => {
 function animate() {
     requestAnimationFrame(animate);
 
-    // movimento
-    if (keys["w"]) {
-        camera.position.x -= Math.sin(yaw)*speed;
-        camera.position.z -= Math.cos(yaw)*speed;
-    }
-    if (keys["s"]) {
-        camera.position.x += Math.sin(yaw)*speed;
-        camera.position.z += Math.cos(yaw)*speed;
-    }
-    if (keys["a"]) {
-        camera.position.x -= Math.cos(yaw)*speed;
-        camera.position.z += Math.sin(yaw)*speed;
-    }
-    if (keys["d"]) {
-        camera.position.x += Math.cos(yaw)*speed;
-        camera.position.z -= Math.sin(yaw)*speed;
-    }
+    // movimento FPS real
+    let forward = new THREE.Vector3(
+        Math.sin(yaw),
+        0,
+        Math.cos(yaw)
+    );
 
-    // inimigos te seguem
+    let right = new THREE.Vector3(
+        Math.cos(yaw),
+        0,
+        -Math.sin(yaw)
+    );
+
+    if (keys["w"]) camera.position.add(forward.clone().multiplyScalar(-speed));
+    if (keys["s"]) camera.position.add(forward.clone().multiplyScalar(speed));
+    if (keys["a"]) camera.position.add(right.clone().multiplyScalar(-speed));
+    if (keys["d"]) camera.position.add(right.clone().multiplyScalar(speed));
+
+    // IA inimigos
     enemies.forEach(enemy => {
-        let dx = camera.position.x - enemy.position.x;
-        let dz = camera.position.z - enemy.position.z;
+        let dir = new THREE.Vector3().subVectors(camera.position, enemy.position);
+        let dist = dir.length();
 
-        let dist = Math.sqrt(dx*dx + dz*dz);
-
-        enemy.position.x += dx/dist * 0.02;
-        enemy.position.z += dz/dist * 0.02;
+        dir.normalize();
+        enemy.position.add(dir.multiplyScalar(0.03));
 
         if (dist < 1.5) {
-            hp -= 0.1;
+            hp -= 0.2;
         }
     });
 
