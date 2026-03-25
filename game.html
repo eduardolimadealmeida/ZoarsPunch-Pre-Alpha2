@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ZoarsPunch FPS</title>
+<title>ZoarsPunch FPS Pro</title>
 
 <style>
 body { margin: 0; overflow: hidden; background: #000; }
@@ -13,47 +13,27 @@ body { margin: 0; overflow: hidden; background: #000; }
     left: 10px;
     color: white;
     font-family: Arial;
-    font-size: 18px;
 }
 
 #crosshair {
     position: fixed;
     top: 50%;
     left: 50%;
-    width: 20px;
-    height: 20px;
-    margin-left: -10px;
-    margin-top: -10px;
-}
-
-#crosshair::before, #crosshair::after {
-    content: "";
-    position: absolute;
-    background: white;
-}
-
-#crosshair::before {
-    width: 20px;
-    height: 2px;
-    top: 9px;
-}
-
-#crosshair::after {
-    width: 2px;
-    height: 20px;
-    left: 9px;
+    width: 10px;
+    height: 10px;
+    border: 2px solid white;
+    transform: translate(-50%, -50%);
 }
 
 #gun {
     position: fixed;
     bottom: 0;
-    right: 50px;
-    width: 200px;
+    right: 60px;
+    width: 220px;
     height: 120px;
-    background: linear-gradient(45deg, #444, #222);
+    background: linear-gradient(45deg, #555, #222);
     border-radius: 20px;
-    transform: rotate(-10deg);
-    opacity: 0.9;
+    transform: rotate(-8deg);
 }
 
 #hitmarker {
@@ -61,7 +41,7 @@ body { margin: 0; overflow: hidden; background: #000; }
     top: 50%;
     left: 50%;
     color: red;
-    font-size: 30px;
+    font-size: 25px;
     transform: translate(-50%, -50%);
     opacity: 0;
 }
@@ -71,8 +51,8 @@ body { margin: 0; overflow: hidden; background: #000; }
 <body>
 
 <div id="ui">
-    ❤️ Vida: <span id="hp">100</span><br>
-    👾 Inimigos: <span id="enemies">0</span>
+❤️ Vida: <span id="hp">100</span><br>
+👾 Inimigos: <span id="enemies">0</span>
 </div>
 
 <div id="crosshair"></div>
@@ -92,84 +72,96 @@ document.body.appendChild(renderer.domElement);
 
 // luz
 let light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(5,10,7);
+light.position.set(10,20,10);
 scene.add(light);
 
-// chão bonito
+// chão
 let floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(200, 200),
-    new THREE.MeshStandardMaterial({color: 0x228B22})
+    new THREE.PlaneGeometry(200,200),
+    new THREE.MeshStandardMaterial({color: 0x2e8b57})
 );
 floor.rotation.x = -Math.PI/2;
 scene.add(floor);
 
 // player
 camera.position.y = 2;
-let yaw = 0, pitch = 0;
-let speed = 0.15;
+
+let yaw = 0;
+let pitch = 0;
+let targetYaw = 0;
+let targetPitch = 0;
+
+let velocity = new THREE.Vector3();
+let speed = 0.12;
+let friction = 0.85;
+
 let hp = 100;
 
-// inimigos
+// inimigos (estilo agentes)
 let enemies = [];
 
 function spawnEnemy() {
     let enemy = new THREE.Mesh(
         new THREE.BoxGeometry(1,2,1),
-        new THREE.MeshStandardMaterial({color: 0xff4444})
+        new THREE.MeshStandardMaterial({color: 0x00aaff})
     );
 
-    enemy.position.set(
-        Math.random()*40-20,
-        1,
-        Math.random()*40-20
-    );
+    enemy.position.set(Math.random()*40-20,1,Math.random()*40-20);
+    enemy.hp = 40;
 
-    enemy.hp = 30;
     scene.add(enemy);
     enemies.push(enemy);
 }
 
-for (let i=0;i<8;i++) spawnEnemy();
+for(let i=0;i<6;i++) spawnEnemy();
 
-// controles
+// teclado
 let keys = {};
 document.addEventListener("keydown", e => keys[e.key]=true);
 document.addEventListener("keyup", e => keys[e.key]=false);
 
-// mouse
+// mouse lock
 document.body.addEventListener("click", () => {
     document.body.requestPointerLock();
 });
 
+// rotação SUAVE (melhorada)
 document.addEventListener("mousemove", e => {
     if (document.pointerLockElement === document.body) {
-        yaw -= e.movementX * 0.002;
-        pitch -= e.movementY * 0.002;
+        targetYaw -= e.movementX * 0.002;
+        targetPitch -= e.movementY * 0.002;
 
-        pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
-        camera.rotation.set(pitch, yaw, 0);
+        targetPitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, targetPitch));
     }
 });
 
-// tiro melhorado
+// tiro com recoil + spread
 document.addEventListener("mousedown", () => {
+    let spread = 0.02;
+
+    let x = (Math.random()-0.5) * spread;
+    let y = (Math.random()-0.5) * spread;
+
     let ray = new THREE.Raycaster();
-    ray.setFromCamera(new THREE.Vector2(0,0), camera);
+    ray.setFromCamera(new THREE.Vector2(x,y), camera);
 
     let hits = ray.intersectObjects(enemies);
 
+    // recoil
+    targetPitch += 0.03;
+
     if (hits.length > 0) {
         let enemy = hits[0].object;
-        enemy.hp -= 15;
+        enemy.hp -= 20;
 
         // hitmarker
         let hit = document.getElementById("hitmarker");
         hit.style.opacity = 1;
-        setTimeout(() => hit.style.opacity = 0, 100);
+        setTimeout(()=>hit.style.opacity=0,100);
 
         if (enemy.hp <= 0) {
             scene.remove(enemy);
-            enemies = enemies.filter(e => e !== enemy);
+            enemies = enemies.filter(e=>e!==enemy);
             spawnEnemy();
         }
     }
@@ -179,34 +171,34 @@ document.addEventListener("mousedown", () => {
 function animate() {
     requestAnimationFrame(animate);
 
-    // movimento FPS real
-    let forward = new THREE.Vector3(
-        Math.sin(yaw),
-        0,
-        Math.cos(yaw)
-    );
+    // suavizar câmera
+    yaw += (targetYaw - yaw) * 0.15;
+    pitch += (targetPitch - pitch) * 0.15;
 
-    let right = new THREE.Vector3(
-        Math.cos(yaw),
-        0,
-        -Math.sin(yaw)
-    );
+    camera.rotation.set(pitch, yaw, 0);
 
-    if (keys["w"]) camera.position.add(forward.clone().multiplyScalar(-speed));
-    if (keys["s"]) camera.position.add(forward.clone().multiplyScalar(speed));
-    if (keys["a"]) camera.position.add(right.clone().multiplyScalar(-speed));
-    if (keys["d"]) camera.position.add(right.clone().multiplyScalar(speed));
+    // movimento suave
+    let forward = new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+    let right = new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
 
-    // IA inimigos
-    enemies.forEach(enemy => {
+    if(keys["w"]) velocity.add(forward.clone().multiplyScalar(-speed));
+    if(keys["s"]) velocity.add(forward.clone().multiplyScalar(speed));
+    if(keys["a"]) velocity.add(right.clone().multiplyScalar(-speed));
+    if(keys["d"]) velocity.add(right.clone().multiplyScalar(speed));
+
+    velocity.multiplyScalar(friction);
+    camera.position.add(velocity);
+
+    // inimigos mais naturais
+    enemies.forEach(enemy=>{
         let dir = new THREE.Vector3().subVectors(camera.position, enemy.position);
         let dist = dir.length();
 
         dir.normalize();
-        enemy.position.add(dir.multiplyScalar(0.03));
+        enemy.position.add(dir.multiplyScalar(0.02));
 
-        if (dist < 1.5) {
-            hp -= 0.2;
+        if(dist < 1.5){
+            hp -= 0.1;
         }
     });
 
